@@ -1,27 +1,30 @@
-import {
-  sqliteTable,
-  text,
-  integer,
-  uniqueIndex,
-} from 'drizzle-orm/sqlite-core';
-import { sql, type InferInsertModel, type InferSelectModel } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
+import { integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const userSession = sqliteTable('user_session', {
-  id: text('id').primaryKey().notNull(),
+  id: text().primaryKey().notNull(),
   userId: text('user_id')
     .notNull()
     .references(() => user.id),
   expiresAt: integer('expires_at').notNull(),
 });
 
+export const userPreferences = sqliteTable('user_preferences', {
+  userId: text('user_id')
+    .primaryKey()
+    .notNull()
+    .references(() => user.id),
+  language: text(),
+});
+
 export const user = sqliteTable(
   'user',
   {
-    id: text('id').primaryKey().notNull(),
-    name: text('name'),
-    email: text('email').notNull(),
-    username: text('username').notNull(),
-    rating: integer('rating'),
+    id: text().primaryKey().notNull(),
+    name: text(),
+    email: text().notNull(),
+    username: text().notNull(),
+    rating: integer(),
     selectedClub: text('selected_club')
       .notNull()
       .references(() => club.id),
@@ -36,26 +39,27 @@ export const user = sqliteTable(
 );
 
 export const club = sqliteTable('club', {
-  id: text('id').primaryKey().notNull(),
-  name: text('name').notNull(),
-  description: text('description'),
-  createdAt: integer('created_at'),
+  id: text().primaryKey().notNull(),
+  name: text().notNull(),
+  description: text(),
+  createdAt: integer('created_at').notNull(),
   lichessTeam: text('lichess_team'),
 });
 
 export const clubsToUsers = sqliteTable('clubs_to_users', {
-  id: text('id').primaryKey().notNull(),
+  id: text().primaryKey().notNull(),
   clubId: text('club_id')
     .notNull()
     .references(() => club.id),
   userId: text('user_id')
     .notNull()
     .references(() => user.id),
-  status: text('status').notNull(),
+  status: text().notNull(),
 });
 
 export const game = sqliteTable('game', {
-  id: text('id').primaryKey().notNull(),
+  id: text().primaryKey().notNull(),
+  gameNumber: integer('game_number').notNull(),
   roundNumber: integer('round_number').notNull(),
   roundName: text('round_name'),
   whiteId: text('white_id')
@@ -66,19 +70,18 @@ export const game = sqliteTable('game', {
     .references(() => player.id),
   whitePrevGameId: text('white_prev_game_id'),
   blackPrevGameId: text('black_prev_game_id'),
-  result: text('result'),
+  result: text(),
   tournamentId: text('tournament_id')
     .notNull()
     .references(() => tournament.id),
-  gameNumber: integer('game_number'),
 });
 
 export const player = sqliteTable('player', {
-  id: text('id').primaryKey().notNull(),
-  nickname: text('nickname').notNull(),
-  realname: text('realname'),
+  id: text().primaryKey().notNull(),
+  nickname: text().notNull(),
+  realname: text(),
   userId: text('user_id').references(() => user.id),
-  rating: integer('rating'),
+  rating: integer(),
   clubId: text('club_id')
     .notNull()
     .references(() => club.id),
@@ -86,35 +89,28 @@ export const player = sqliteTable('player', {
 });
 
 export const playersToTournaments = sqliteTable('players_to_tournaments', {
-  id: text('id').primaryKey().notNull(),
+  id: text().primaryKey().notNull(),
   playerId: text('player_id')
     .notNull()
     .references(() => player.id),
   tournamentId: text('tournament_id')
     .notNull()
     .references(() => tournament.id),
-  wins: integer('wins').notNull(),
-  losses: integer('losses').notNull(),
-  draws: integer('draws').notNull(),
+  wins: integer().notNull(),
+  losses: integer().notNull(),
+  draws: integer().notNull(),
   colorIndex: integer('color_index').notNull(),
-  place: integer('place'),
-  exited: integer('exited'),
-});
-
-export const userPreferences = sqliteTable('user_preferences', {
-  userId: text('user_id')
-    .primaryKey()
-    .notNull()
-    .references(() => user.id),
-  language: text('language'),
+  place: integer(),
+  out: integer(),
+  pairingNumber: integer('pairing_number'),
 });
 
 export const tournament = sqliteTable('tournament', {
-  id: text('id').primaryKey().notNull(),
-  name: text('name').notNull(),
-  format: text('format').notNull(),
-  type: text('type').notNull(),
-  date: text('date').notNull(),
+  id: text().primaryKey().notNull(),
+  name: text().notNull(),
+  format: text().notNull(),
+  type: text().notNull(),
+  date: text().notNull(),
   createdAt: integer('created_at').notNull(),
   clubId: text('club_id')
     .notNull()
@@ -123,32 +119,7 @@ export const tournament = sqliteTable('tournament', {
   closedAt: integer('closed_at'),
   roundsNumber: integer('rounds_number'),
   ongoingRound: integer('ongoing_round').notNull(),
-  rated: integer('rated'),
+  rated: integer(),
 });
 
-export type DatabasePlayer = InferSelectModel<typeof player>;
-export type DatabaseTournament = InferSelectModel<typeof tournament>;
-export type DatabaseClub = InferSelectModel<typeof club>;
-export type DatabaseClubsToUsers = InferSelectModel<typeof clubsToUsers>;
-export type DatabaseGame = InferSelectModel<typeof game>;
-export type DatabasePlayerToTournament = InferSelectModel<
-  typeof playersToTournaments
->;
-export type InsertDatabasePlayer = InferInsertModel<typeof player>;
-export type InsertDatabaseTournament = InferInsertModel<typeof tournament>;
-export type InsertDatabaseClub = InferInsertModel<typeof club>;
-export type InsertDatabaseClubsToUsers = InferInsertModel<typeof clubsToUsers>;
-export type InsertDatabaseGame = InferInsertModel<typeof game>;
-export type InsertDatabasePlayerToTournament = InferInsertModel<
-  typeof playersToTournaments
->;
-export type StatusInClub = 'admin' | 'moderator';
-
-export type DatabaseSession = InferSelectModel<typeof userSession>;
-export type DatabasePreferences = InferSelectModel<typeof userPreferences>;
-export type DatabaseUser = InferSelectModel<typeof user>;
-export type InsertDatabaseSession = InferInsertModel<typeof userSession>;
-export type InsertDatabasePreferences = InferInsertModel<
-  typeof userPreferences
->;
-export type InsertDatabaseUser = InferInsertModel<typeof user>;
+export const drizzleMigrations = sqliteTable('__drizzle_migrations', {});
