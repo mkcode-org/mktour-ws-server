@@ -1,6 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-
-import { club, clubsToUsers, game, player, playersToTournaments, tournament, user, userPreferences, userSession } from "./schema";
+import { user, userSession, userPreferences, club, clubsToUsers, tournament, game, player, playersToTournaments } from "./schema";
 
 export const userSessionRelations = relations(userSession, ({one}) => ({
 	user: one(user, {
