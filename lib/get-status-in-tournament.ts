@@ -33,7 +33,10 @@ export const getStatusInTournament = async (
   ).at(0)?.status;
   if (dbStatus) return 'organizer';
   const playerDb = (
-    await db.select().from(player).where(eq(player.userId, user.id))
+    await db
+      .select()
+      .from(player)
+      .where(and(eq(player.clubId, clubId), eq(player.userId, user.id)))
   ).at(0);
   if (!playerDb) return 'viewer';
   const isHere = (
@@ -42,7 +45,7 @@ export const getStatusInTournament = async (
       .from(playersToTournaments)
       .where(
         and(
-          eq(playersToTournaments.playerId, player.id),
+          eq(playersToTournaments.playerId, playerDb.id),
           eq(playersToTournaments.tournamentId, tournamentId),
         ),
       )
