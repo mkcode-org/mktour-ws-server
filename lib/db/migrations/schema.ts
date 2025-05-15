@@ -1,5 +1,9 @@
-import { sql } from 'drizzle-orm';
-import { integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import {
+  sqliteTable,
+  text,
+  integer,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
 
 export const userSession = sqliteTable('user_session', {
   id: text().primaryKey().notNull(),
@@ -37,6 +41,48 @@ export const user = sqliteTable(
     };
   },
 );
+
+export const affiliation = sqliteTable(
+  'affiliation',
+  {
+    id: text().primaryKey().notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    clubId: text('club_id')
+      .notNull()
+      .references(() => club.id, { onDelete: 'cascade' }),
+    playerId: text('player_id')
+      .notNull()
+      .references(() => player.id, { onDelete: 'cascade' }),
+    status: text().notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => {
+    return {
+      userClubUniqueIdx: uniqueIndex('affiliation_user_club_unique_idx').on(
+        table.userId,
+        table.clubId,
+      ),
+    };
+  },
+);
+
+export const notification = sqliteTable('notification', {
+  id: text().primaryKey().notNull(),
+  createdAt: integer('created_at').notNull(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  clubId: text('club_id')
+    .notNull()
+    .references(() => club.id, { onDelete: 'cascade' }),
+  forWhom: text('for_whom').notNull(),
+  notificationType: text('notification_type').notNull(),
+  isSeen: integer('is_seen').notNull(),
+  metadata: text(),
+});
 
 export const club = sqliteTable('club', {
   id: text().primaryKey().notNull(),
@@ -76,18 +122,6 @@ export const game = sqliteTable('game', {
     .references(() => tournament.id),
 });
 
-export const player = sqliteTable('player', {
-  id: text().primaryKey().notNull(),
-  nickname: text().notNull(),
-  realname: text(),
-  userId: text('user_id').references(() => user.id),
-  rating: integer().notNull(),
-  clubId: text('club_id')
-    .notNull()
-    .references(() => club.id),
-  lastSeen: integer('last_seen'),
-});
-
 export const playersToTournaments = sqliteTable('players_to_tournaments', {
   id: text().primaryKey().notNull(),
   playerId: text('player_id')
@@ -101,7 +135,7 @@ export const playersToTournaments = sqliteTable('players_to_tournaments', {
   draws: integer().notNull(),
   colorIndex: integer('color_index').notNull(),
   place: integer(),
-  out: integer(),
+  isOut: integer('is_out'),
   pairingNumber: integer('pairing_number'),
 });
 
@@ -119,7 +153,34 @@ export const tournament = sqliteTable('tournament', {
   closedAt: integer('closed_at'),
   roundsNumber: integer('rounds_number'),
   ongoingRound: integer('ongoing_round').notNull(),
-  rated: integer(),
+  rated: integer().notNull(),
 });
+
+export const player = sqliteTable(
+  'player',
+  {
+    id: text().primaryKey().notNull(),
+    nickname: text().notNull(),
+    realname: text(),
+    userId: text('user_id').references(() => user.id),
+    rating: integer().notNull(),
+    clubId: text('club_id')
+      .notNull()
+      .references(() => club.id),
+    lastSeen: integer('last_seen'),
+  },
+  (table) => {
+    return {
+      userClubUniqueIdx: uniqueIndex('player_user_club_unique_idx').on(
+        table.userId,
+        table.clubId,
+      ),
+      nicknameClubUniqueIdx: uniqueIndex('player_nickname_club_unique_idx').on(
+        table.nickname,
+        table.clubId,
+      ),
+    };
+  },
+);
 
 export const drizzleMigrations = sqliteTable('__drizzle_migrations', {});
