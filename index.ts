@@ -13,7 +13,7 @@ export interface WebSocketData {
   status: Status;
 }
 
-const server = Bun.serve<WebSocketData>({
+const server = Bun.serve<WebSocketData, {}>({
   port: process.env.PORT || 7070,
   tls: TLS,
   async fetch(req, server) {
