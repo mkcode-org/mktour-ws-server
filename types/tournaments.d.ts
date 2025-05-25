@@ -1,4 +1,6 @@
+import type { user } from '@/lib/db/migrations/schema';
 import { DatabasePlayer } from '@/lib/db/schema/tournaments';
+import type { InferSelectModel } from 'drizzle-orm';
 
 /**
  * combination of player general info and tournament performance, recorded in players_to_tournaments
@@ -66,3 +68,5 @@ type RoundName =
   | '1/32'
   | '1/64'
   | '1/128';
+
+export type DatabaseUser = InferSelectModel<typeof user>;

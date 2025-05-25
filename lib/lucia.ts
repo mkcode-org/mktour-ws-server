@@ -1,8 +1,8 @@
 import { adapter } from '@/lib/lucia-adapter';
+import type { DatabaseUser } from '@/types/tournaments';
 import { Lucia } from 'lucia';
 
 import type { Session, User } from 'lucia';
-import type { DatabaseUser } from '@/lib/db/schema/auth';
 
 export const lucia = new Lucia(adapter, {
   sessionCookie: {
@@ -16,7 +16,7 @@ export const lucia = new Lucia(adapter, {
       name: attributes.name,
       email: attributes.email,
       rating: attributes.rating,
-      selected_club: attributes.selected_club,
+      selected_club: attributes.selectedClub,
     };
   },
 });

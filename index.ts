@@ -4,63 +4,141 @@ import { TLS } from './lib/config/tls';
 import { getStatusInTournament } from './lib/get-status-in-tournament';
 
 import type { Status } from './lib/get-status-in-tournament';
-import type { Message } from './types/ws-events';
 import { errorMessage } from './lib/ws-error-message';
-
-export interface WebSocketData {
-  username: string;
-  tournamentId: string;
-  status: Status;
-}
+import type {
+  ConnectionType,
+  DashboardMessage,
+  GlobalMessage,
+  Message,
+  WebSocketData,
+} from './types/ws-events';
+import { decrypt } from './lib/crypto';
 
 const server = Bun.serve<WebSocketData, {}>({
   port: process.env.PORT || 7070,
   tls: TLS,
   async fetch(req, server) {
     const url = new URL(req.url);
-    const session = req.headers.get('sec-websocket-protocol');
+    const session = decrypt(String(req.headers.get('sec-websocket-protocol')));
     const { user } = await validateRequest(session ?? '');
 
-    const tournamentId = url.pathname.replace('/', '');
-    let status = await getStatusInTournament(user, tournamentId);
+    if (!user) {
+      return new Response('unauthorized', { status: 401 });
+    }
+
+    const path = url.pathname;
+
+    let connectionType: ConnectionType;
+    let tournamentId: string | undefined;
+    let status: Status | undefined;
+
+    if (path.startsWith('/tournament')) {
+      connectionType = 'tournament';
+      tournamentId = path.replace('/tournament/', '');
+      status = await getStatusInTournament(user, tournamentId);
+    } else if (path.startsWith('/global')) {
+      connectionType = 'global';
+    } else {
+      return new Response('not found', { status: 404 });
+    }
 
     server.upgrade(req, {
-      data: { tournamentId, username: user?.username, status },
+      data: {
+        connectionType,
+        username: user.username,
+        tournamentId,
+        status,
+        userId: user.id,
+      },
     });
 
-    console.log(`we are fetched! by ${user?.username}`);
+    console.log(
+      `${user.username} connected via ${connectionType}${tournamentId ? ` (${tournamentId})` : ''}`,
+    );
 
     return new Response(JSON.stringify(req.headers), {
       headers: { 'Content-Type': 'text/json' },
     });
   },
-
   websocket: {
     sendPings: true,
     open(ws) {
-      const msg = `${ws.data.username} has entered. status: ${ws.data.status}`;
-      console.log(msg);
-      ws.subscribe(ws.data.tournamentId);
+      if (ws.data.connectionType === 'tournament') {
+        const msg = `${ws.data.username} has entered tournament ${ws.data.tournamentId}. status: ${ws.data.status}`;
+        console.log(msg);
+        ws.subscribe(`tournament:${ws.data.tournamentId}`);
+      } else if (ws.data.connectionType === 'global') {
+        const msg = `${ws.data.username} has connected to global channel`;
+        console.log(msg);
+        ws.subscribe(`user:${ws.data.userId}`);
+      }
     },
     message(ws, message) {
-      if (!message) ws.send('');
-      else {
-        if (message instanceof Buffer) return;
+      if (!message) {
+        ws.send('');
+        return;
+      }
+
+      if (message instanceof Buffer) return;
+
+      try {
         const data = JSON.parse(message) as Message;
-        if (ws.data.status === 'organizer') {
-          console.log(ws.data.tournamentId, `${ws.data.username}: ${message}`);
-          ws.publish(ws.data.tournamentId, message);
-        } else {
-          ws.send(errorMessage(data));
+        if (ws.data.connectionType === 'tournament') {
+          handleTournamentMessage(ws, data as DashboardMessage);
+        } else if (ws.data.connectionType === 'global') {
+          handleGlobalMessage(ws, data as GlobalMessage);
         }
+      } catch (error) {
+        console.error('failed to parse message:', error);
+        ws.send(JSON.stringify({ error: 'invalid message format' }));
       }
     },
     close(ws) {
-      const msg = `${ws.data.username} has left`;
-      console.log(msg);
-      ws.unsubscribe(ws.data.tournamentId);
+      if (ws.data.connectionType === 'tournament') {
+        const msg = `${ws.data.username} has left tournament ${ws.data.tournamentId}`;
+        console.log(msg);
+        ws.unsubscribe(`tournament:${ws.data.tournamentId}`);
+      } else if (ws.data.connectionType === 'global') {
+        const msg = `${ws.data.username} has disconnected from global channel`;
+        console.log(msg);
+        ws.unsubscribe(`user:${ws.data.userId}`);
+      }
     },
   },
 });
 
+function handleTournamentMessage(
+  ws: Bun.ServerWebSocket<WebSocketData>,
+  message: DashboardMessage,
+) {
+  if (ws.data.connectionType !== 'tournament' || !ws.data.tournamentId) return;
+
+  if (ws.data.status === 'organizer') {
+    console.log(
+      `tournament ${ws.data.tournamentId}, ${ws.data.username}: ${JSON.stringify(message)}`,
+    );
+    ws.publish(`tournament:${ws.data.tournamentId}`, JSON.stringify(message));
+  } else {
+    ws.send(errorMessage(message));
+  }
+}
+
+function handleGlobalMessage(
+  ws: Bun.ServerWebSocket<WebSocketData>,
+  message: GlobalMessage,
+) {
+  switch (message.type) {
+    case 'user_notification':
+      console.log(`global: ${ws.data.username}: ${JSON.stringify(message)}`);
+      ws.publish(`user:${ws.data.userId}`, JSON.stringify(message));
+      break;
+
+    default:
+      console.log(`unknown message: ${JSON.stringify(message)}`);
+  }
+}
+
 console.log(`Listening on ${server.hostname}:${server.port}`);
+console.log('supported endpoints:');
+console.log('  - /tournament/{tournamentId} - for tournament connections');
+console.log('  - /global/{userId} - for global user-connections');
