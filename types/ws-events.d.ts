@@ -27,10 +27,17 @@ type ErrorMessage = {
   message: string;
 };
 
+type GlobalErrorMessage = {
+  recipientId: string;
+  type: 'error';
+  message: string;
+};
+
+// recipientId = userId
 type GlobalMessage =
-  | { type: 'user_notification'; userId: string }
-  | { type: 'removed_from_club'; clubId: string; userId: string }
-  | ErrorMessage;
+  | { type: 'user_notification'; recipientId: string }
+  | { type: 'removed_from_club'; clubId: string; recipientId: string }
+  | GlobalErrorMessage;
 
 type ConnectionType = 'tournament' | 'global';
 

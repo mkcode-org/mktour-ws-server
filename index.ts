@@ -52,10 +52,6 @@ const server = Bun.serve<WebSocketData, {}>({
       },
     });
 
-    console.log(
-      `${user.username} connected via ${connectionType}${tournamentId ? ` (${tournamentId})` : ''}`,
-    );
-
     return new Response(JSON.stringify(req.headers), {
       headers: { 'Content-Type': 'text/json' },
     });
@@ -127,18 +123,13 @@ function handleGlobalMessage(
   ws: Bun.ServerWebSocket<WebSocketData>,
   message: GlobalMessage,
 ) {
-  switch (message.type) {
-    case 'user_notification':
-      console.log(`global: ${ws.data.username}: ${JSON.stringify(message)}`);
-      ws.publish(`user:${ws.data.userId}`, JSON.stringify(message));
-      break;
+  if (ws.data.connectionType !== 'global') return;
 
-    default:
-      console.log(`unknown message: ${JSON.stringify(message)}`);
-  }
+  console.log(`global, ${ws.data.username}: ${JSON.stringify(message)}`);
+  ws.publish(`user:${message.recipientId}`, JSON.stringify(message));
 }
 
 console.log(`Listening on ${server.hostname}:${server.port}`);
 console.log('supported endpoints:');
 console.log('  - /tournament/{tournamentId} - for tournament connections');
-console.log('  - /global/{userId} - for global user-connections');
+console.log('  - /global - for global user-connections');
