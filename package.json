@@ -3,10 +3,10 @@
   "module": "index.ts",
   "type": "module",
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "^1.2.14"
   },
   "peerDependencies": {
-    "typescript": "^5.3.3"
+    "typescript": "^5.8.3"
   },
   "scripts": {
     "start": "bun run index.ts",
@@ -15,11 +15,11 @@
     "format": "bunx prettier . --write"
   },
   "dependencies": {
-    "@libsql/client": "^0.14.0",
+    "@libsql/client": "^0.15.7",
     "@lucia-auth/adapter-drizzle": "^1.1.0",
     "dotenv": "^16.5.0",
-    "drizzle-kit": "^0.28.1",
-    "drizzle-orm": "^0.36.4",
+    "drizzle-kit": "^0.31.1",
+    "drizzle-orm": "^0.43.1",
     "lucia": "^3.2.2",
     "nanoid": "^5.1.5",
     "prettier": "^3.5.3"
