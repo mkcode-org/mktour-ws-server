@@ -20,6 +20,9 @@ const server = Bun.serve<WebSocketData, {}>({
   async fetch(req, server) {
     const url = new URL(req.url);
     const session = decrypt(String(req.headers.get('sec-websocket-protocol')));
+    const isOpenStatus =
+      String(req.headers.get('x-openstatus')) === process.env.OPENSTATUS_HEADER;
+    if (isOpenStatus) return new Response('ok', { status: 200 });
     const { user } = await validateRequest(session ?? '');
 
     if (!user) {
