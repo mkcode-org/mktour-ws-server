@@ -1,8 +1,10 @@
 # use the official Bun image
 # see all versions at https://hub.docker.com/r/oven/bun/tags
-FROM oven/bun:1.2.14 AS base
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 CMD [ "executable" ]
+FROM oven/bun:1.3.2 AS base
 WORKDIR /usr/src/app
+
+# Install curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 # install dependencies into temp directory
 # this will cache them and speed up future builds
@@ -35,4 +37,10 @@ COPY --from=prerelease /usr/src/app/ .
 USER bun
 ENV PORT=7070
 EXPOSE 7070/tcp
+
+# Health check using curl to check if the server is responding
+# Note: The health check requires OPENSTATUS_HEADER to be set in docker-compose
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+  CMD curl -f -H "x-openstatus: ${OPENSTATUS_HEADER}" http://localhost:7070/ || exit 1
+
 ENTRYPOINT [ "bun", "start" ]
