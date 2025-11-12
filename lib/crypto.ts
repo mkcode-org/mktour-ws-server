@@ -1,116 +1,89 @@
 // encrypt-decrypt.ts
 
-// A simple (NOT cryptographically secure) XOR cipher implementation
-// This is for demonstration purposes and should NOT be used for sensitive data.
+import { createCipheriv, createDecipheriv, pbkdf2Sync, randomBytes } from 'crypto';
 
-const SECRET_KEY_LENGTH = 32; // A fixed length for our "secret key" for simplicity
+const PBKDF2_ITERATIONS = 100000;
+const SALT_LENGTH = 16;
+const IV_LENGTH = 16;
+const KEY_LENGTH = 32;
+const ALGORITHM = 'aes-256-cbc';
 
-/**
- * Derives a consistent, repeatable "key stream" from a secret key.
- * This is a very basic derivation and NOT cryptographically secure.
- * @param secretKey The secret key string.
- * @returns A Uint8Array representing the key stream.
- */
-function deriveKeyStream(): Uint8Array {
-  const secretKey = process.env.SECRET_KEY ?? '';
-  const keyBytes = new TextEncoder().encode(secretKey);
-  const keyStream = new Uint8Array(SECRET_KEY_LENGTH);
+// Type-safe helper to convert Buffer to Uint8Array for crypto functions
+// Buffer extends Uint8Array at runtime, this just satisfies TypeScript
+const toUint8Array = (buffer: Buffer): Uint8Array<ArrayBuffer> => buffer as unknown as Uint8Array<ArrayBuffer>;
 
-  for (let i = 0; i < SECRET_KEY_LENGTH; i++) {
-    keyStream[i] = keyBytes[i % keyBytes.length] || 0; // Simple repetition/padding
+function getSecretKey(): string {
+  const key = process.env.SECRET_KEY;
+  if (!key || key.length < 32) {
+    throw new Error('SECRET_KEY must be at least 32 characters and match between app and ws server');
   }
-  return keyStream;
+  return key;
 }
 
-/**
- * Encrypts a string using a simple XOR cipher and a secret key.
- * The output is a base64url encoded string (which does not contain ':').
- * @param text The string to encrypt.
- * @param secretKey The secret key.
- * @returns The encrypted, base64url encoded string.
- */
+function deriveKey(salt: Buffer): Buffer {
+  const secretKey = getSecretKey();
+  return pbkdf2Sync(secretKey, toUint8Array(salt), PBKDF2_ITERATIONS, KEY_LENGTH, 'sha256');
+}
+
 export function encrypt(text: string): string {
-  const secretKey = process.env.SECRET_KEY ?? '';
+  const salt = randomBytes(SALT_LENGTH);
+  const iv = randomBytes(IV_LENGTH);
+  const key = deriveKey(salt);
 
-  const textBytes = new TextEncoder().encode(text);
-  const keyStream = deriveKeyStream();
-  const encryptedBytes = new Uint8Array(textBytes.length);
+  const cipher = createCipheriv(ALGORITHM, toUint8Array(key), toUint8Array(iv));
+  let encrypted = cipher.update(text, 'utf8', 'base64');
+  encrypted += cipher.final('base64');
 
-  for (let i = 0; i < textBytes.length; i++) {
-    encryptedBytes[i] = textBytes[i] ^ keyStream[i % keyStream.length];
-  }
+  const combined = Buffer.concat([
+    toUint8Array(salt),
+    toUint8Array(iv),
+    toUint8Array(Buffer.from(encrypted, 'base64')),
+  ]);
 
-  // Convert to Base64URL to avoid colons and other problematic characters
-  return base64UrlEncode(encryptedBytes);
+  return base64UrlEncode(combined);
 }
 
-/**
- * Decrypts a base64url encoded string using a simple XOR cipher and a secret key.
- * @param encryptedText The encrypted, base64url encoded string.
- * @param secretKey The secret key.
- * @returns The decrypted string.
- */
 export function decrypt(encryptedText: string): string {
-  const secretKey = process.env.SECRET_KEY ?? '';
+  const combined = base64UrlDecode(encryptedText);
 
-  const encryptedBytes = base64UrlDecode(encryptedText);
-  const keyStream = deriveKeyStream();
-  const decryptedBytes = new Uint8Array(encryptedBytes.length);
+  const salt = combined.subarray(0, SALT_LENGTH);
+  const iv = combined.subarray(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
+  const encryptedBytes = combined.subarray(SALT_LENGTH + IV_LENGTH);
 
-  for (let i = 0; i < encryptedBytes.length; i++) {
-    decryptedBytes[i] = encryptedBytes[i] ^ keyStream[i % keyStream.length];
-  }
+  const key = deriveKey(salt);
 
-  return new TextDecoder().decode(decryptedBytes);
+  const decipher = createDecipheriv(ALGORITHM, toUint8Array(key), toUint8Array(iv));
+  let decrypted = decipher.update(toUint8Array(encryptedBytes));
+  decrypted = Buffer.concat([toUint8Array(decrypted), toUint8Array(decipher.final())]);
+
+  return decrypted.toString('utf8');
 }
 
-/**
- * Encodes a Uint8Array to a Base64URL string.
- * This avoids '+', '/', and '=' characters, replacing them with '-', '_', and omitting padding respectively.
- * @param bytes The Uint8Array to encode.
- * @returns The Base64URL string.
- */
-function base64UrlEncode(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, ''); // Remove padding
+function base64UrlEncode(buffer: Buffer): string {
+  return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-/**
- * Decodes a Base64URL string to a Uint8Array.
- * @param base64urlString The Base64URL string to decode.
- * @returns The decoded Uint8Array.
- */
-function base64UrlDecode(base64urlString: string): Uint8Array {
-  // Add padding back if necessary for btoa/atob compatibility
+function base64UrlDecode(base64urlString: string): Buffer {
   let padded = base64urlString.replace(/-/g, '+').replace(/_/g, '/');
   while (padded.length % 4) {
     padded += '=';
   }
-  return new Uint8Array(
-    atob(padded)
-      .split('')
-      .map((char) => char.charCodeAt(0)),
-  );
+  return Buffer.from(padded, 'base64');
 }
 
-// --- Example Usage (for testing purposes) ---
 if (require.main === module) {
-  const mySecretKey = 'super-secret-key-123'; // In a real app, this should be truly secret and not hardcoded
-  const originalString =
-    'Hello, WebSocket Protocols! This is a test string without colons.';
+  const originalString = 'hello websocket! this message travels between app and ws server.';
 
   try {
     const encrypted = encrypt(originalString);
-    console.log('Original String:', originalString);
-    console.log('Encrypted String (Base64URL):', encrypted);
-    console.log("Does encrypted string contain ':'?", encrypted.includes(':')); // Should be false
+    console.log('original:', originalString);
+    console.log('encrypted:', encrypted);
+    console.log("contains ':'?", encrypted.includes(':'));
 
     const decrypted = decrypt(encrypted);
-    console.log('Decrypted String:', decrypted);
-    console.log('Decryption successful:', originalString === decrypted);
+    console.log('decrypted:', decrypted);
+    console.log('success:', originalString === decrypted);
   } catch (error: any) {
-    console.error('An error occurred:', error.message);
+    console.error('error:', error.message);
   }
 }

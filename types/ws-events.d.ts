@@ -50,6 +50,13 @@ type WebSocketData =
       userId: string;
     }
   | {
+      connectionType: 'tournament';
+      username: null;
+      tournamentId: string;
+      status: 'viewer';
+      userId: null;
+    }
+  | {
       connectionType: 'global';
       username: string;
       userId: string;
