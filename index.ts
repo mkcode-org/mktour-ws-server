@@ -5,7 +5,7 @@ import { errorMessage } from './lib/ws-error-message';
 import { decrypt } from './lib/crypto';
 import type { DashboardMessage, GlobalMessage, Message, WebSocketData } from './types/ws-events';
 
-const server = Bun.serve<WebSocketData, {}>({
+const server = Bun.serve<WebSocketData>({
   port: process.env.PORT || 7070,
   tls: TLS,
   async fetch(req, server) {
