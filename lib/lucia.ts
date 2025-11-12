@@ -23,14 +23,11 @@ export const lucia = new Lucia(adapter, {
 
 export const validateRequest = async (
   sessionId: string,
-): Promise<
-  { user: User; session: Session } | { user: null; session: null }
-> => {
-  let result: { user: User; session: Session } | { user: null; session: null } =
-    {
-      user: null,
-      session: null,
-    };
+): Promise<{ user: User; session: Session } | { user: null; session: null }> => {
+  let result: { user: User; session: Session } | { user: null; session: null } = {
+    user: null,
+    session: null,
+  };
 
   if (!sessionId) {
     return result;
