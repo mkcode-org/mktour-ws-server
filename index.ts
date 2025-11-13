@@ -1,9 +1,12 @@
 import { validateRequest } from '@/lib/lucia';
+
 import { TLS } from './lib/config/tls';
+import { decrypt } from './lib/crypto';
 import { getStatusInTournament } from './lib/get-status-in-tournament';
 import { errorMessage } from './lib/ws-error-message';
-import { decrypt } from './lib/crypto';
+
 import type { DashboardMessage, GlobalMessage, Message, WebSocketData } from './types/ws-events';
+import { getClientIp } from './lib/utils';
 
 const server = Bun.serve<WebSocketData>({
   port: process.env.PORT || 7070,
@@ -26,6 +29,7 @@ const server = Bun.serve<WebSocketData>({
       }
 
       if (protocol === 'guest') {
+        const ip = getClientIp(req);
         server.upgrade(req, {
           data: {
             connectionType: 'tournament',
@@ -33,6 +37,7 @@ const server = Bun.serve<WebSocketData>({
             tournamentId,
             status: 'viewer',
             userId: null,
+            ip,
           },
         });
         return;
@@ -83,7 +88,7 @@ const server = Bun.serve<WebSocketData>({
     sendPings: true,
     open(ws) {
       if (ws.data.connectionType === 'tournament') {
-        const username = ws.data.username ?? 'guest';
+        const username = ws.data.username ?? ws.data.ip;
         console.log(`${username} entered tournament ${ws.data.tournamentId} as ${ws.data.status}`);
         ws.subscribe(`tournament:${ws.data.tournamentId}`);
       } else {
@@ -109,7 +114,7 @@ const server = Bun.serve<WebSocketData>({
     },
     close(ws) {
       if (ws.data.connectionType === 'tournament') {
-        const username = ws.data.username ?? 'guest';
+        const username = ws.data.username ?? ws.data.ip;
         console.log(`${username} left tournament ${ws.data.tournamentId}`);
         ws.unsubscribe(`tournament:${ws.data.tournamentId}`);
       } else {

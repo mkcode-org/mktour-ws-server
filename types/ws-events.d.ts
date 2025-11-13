@@ -55,6 +55,7 @@ type WebSocketData =
       tournamentId: string;
       status: 'viewer';
       userId: null;
+      ip: string;
     }
   | {
       connectionType: 'global';
